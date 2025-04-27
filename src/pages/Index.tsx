@@ -1,4 +1,3 @@
-
 import React from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +8,31 @@ import { Badge } from '@/components/ui/badge';
 import StatCard from '@/components/dashboard/StatCard';
 import RecentActivity from '@/components/dashboard/RecentActivity';
 import UpcomingEvents from '@/components/dashboard/UpcomingEvents';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area } from 'recharts';
+
+// Sample data for the engagement streak chart
+const streakData = [
+  { day: 'Mon', engagement: 65 },
+  { day: 'Tue', engagement: 72 },
+  { day: 'Wed', engagement: 80 },
+  { day: 'Thu', engagement: 75 },
+  { day: 'Fri', engagement: 85 },
+  { day: 'Sat', engagement: 90 },
+  { day: 'Sun', engagement: 70 },
+];
+
+// Custom tooltip component
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-background border border-border rounded-lg shadow-lg p-3">
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+        <p className="text-lg font-bold text-brand-orange">{payload[0].value}%</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 const Index = () => {
   return (
@@ -57,17 +81,66 @@ const Index = () => {
                   14 Days
                 </Badge>
               </div>
-              <div className="space-y-3">
-                <div className="flex justify-between mb-2">
-                  <span className="text-muted-foreground">Current Progress</span>
-                  <span className="font-medium">70%</span>
-                </div>
-                <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-brand-orange to-brand-purple rounded-full" style={{ width: '70%' }}></div>
-                </div>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={streakData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <defs>
+                      <linearGradient id="colorEngagement" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#FF6B00" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#FF6B00" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                    <XAxis 
+                      dataKey="day" 
+                      stroke="hsl(var(--muted-foreground))"
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    />
+                    <YAxis 
+                      stroke="hsl(var(--muted-foreground))"
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                      domain={[0, 100]}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area 
+                      type="monotone" 
+                      dataKey="engagement" 
+                      stroke="#FF6B00" 
+                      fill="url(#colorEngagement)"
+                      strokeWidth={0}
+                      fillOpacity={0.3}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="engagement" 
+                      stroke="#FF6B00" 
+                      strokeWidth={3}
+                      dot={{ 
+                        r: 4, 
+                        fill: '#FF6B00',
+                        stroke: 'hsl(var(--background))',
+                        strokeWidth: 2
+                      }}
+                      activeDot={{ 
+                        r: 6, 
+                        fill: '#FF6B00',
+                        stroke: 'hsl(var(--background))',
+                        strokeWidth: 2
+                      }}
+                      animationDuration={1000}
+                      animationEasing="ease-in-out"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex items-center justify-between mt-4">
                 <p className="text-sm text-muted-foreground">
                   Keep interacting daily to earn achievement badges and unlock special features.
                 </p>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-brand-orange"></div>
+                  <span className="text-xs text-muted-foreground">Daily Engagement</span>
+                </div>
               </div>
             </CardContent>
           </Card>
