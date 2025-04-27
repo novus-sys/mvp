@@ -1,154 +1,208 @@
 
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, ThumbsUp, Eye } from 'lucide-react';
+import { MessageSquare, ThumbsUp, Eye, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getQuestions, Question as QuestionType, QuestionFilter } from '@/lib/qa-service';
+import { useSupabaseAuth } from '@/contexts/SupabaseAuthContext';
+import { formatDistanceToNow } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import AskQuestion from './AskQuestion';
 
-interface Question {
-  id: string;
-  title: string;
-  preview: string;
-  tags: string[];
-  votes: number;
-  answers: number;
-  views: number;
-  author: {
-    name: string;
-    avatar?: string;
-    initials: string;
+
+const QuestionList = ({ 
+  filter = {}, 
+  title = "Recent Questions",
+  showAskButton = true
+}: { 
+  filter?: QuestionFilter, 
+  title?: string,
+  showAskButton?: boolean
+}) => {
+  const [questions, setQuestions] = useState<QuestionType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const { user } = useSupabaseAuth();
+  const navigate = useNavigate();
+  const [isAskDialogOpen, setIsAskDialogOpen] = useState(false);
+  
+  const limit = 5;
+
+  useEffect(() => {
+    console.log('Filter or page changed, fetching questions:', { filter, page });
+    setPage(0); // Reset to first page when filter changes
+    fetchQuestions();
+  }, [JSON.stringify(filter)]); // Use JSON.stringify to detect all filter changes
+  
+  useEffect(() => {
+    if (page > 0) { // Only fetch for pagination changes, not initial load
+      console.log('Page changed, fetching more questions:', page);
+      fetchQuestions();
+    }
+  }, [page]);
+
+  const fetchQuestions = async () => {
+    setIsLoading(true);
+    try {
+      const offset = page * limit;
+      const fetchedQuestions = await getQuestions(
+        { ...filter, limit, offset },
+        user
+      );
+      
+      if (page === 0) {
+        setQuestions(fetchedQuestions);
+      } else {
+        setQuestions(prev => [...prev, ...fetchedQuestions]);
+      }
+      
+      setHasMore(fetchedQuestions.length === limit);
+    } catch (error) {
+      console.error('Error fetching questions:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
-  posted: string;
-}
 
-const questions: Question[] = [
-  {
-    id: '1',
-    title: 'What are the best machine learning techniques for natural language processing?',
-    preview: 'I\'m working on a research project that analyzes large text datasets and need to implement...',
-    tags: ['machine-learning', 'nlp', 'research'],
-    votes: 24,
-    answers: 7,
-    views: 342,
-    author: { 
-      name: 'Sanjay Mehta',
-      initials: 'SM',
-    },
-    posted: '2 days ago',
-  },
-  {
-    id: '2',
-    title: 'How to implement efficient data structures for graph algorithms?',
-    preview: 'I\'m comparing different data structures for representing graphs in a network analysis project...',
-    tags: ['algorithms', 'data-structures', 'graphs'],
-    votes: 18,
-    answers: 5,
-    views: 216,
-    author: { 
-      name: 'Priya Sharma',
-      initials: 'PS',
-    },
-    posted: '5 days ago',
-  },
-  {
-    id: '3',
-    title: 'Best practices for designing chemistry experiments in resource-limited settings?',
-    preview: 'Our university has limited lab equipment and I\'m trying to design experiments that are still effective...',
-    tags: ['chemistry', 'experiments', 'education'],
-    votes: 31,
-    answers: 12,
-    views: 490,
-    author: { 
-      name: 'Rahul Kumar',
-      initials: 'RK',
-    },
-    posted: '1 week ago',
-  },
-  {
-    id: '4',
-    title: 'Statistical methods for analyzing qualitative research data in sociology?',
-    preview: 'I\'m conducting interviews for my sociology thesis and need guidance on analyzing the qualitative data...',
-    tags: ['statistics', 'sociology', 'research-methods'],
-    votes: 15,
-    answers: 4,
-    views: 178,
-    author: { 
-      name: 'Aisha Patel',
-      initials: 'AP',
-    },
-    posted: '2 weeks ago',
-  },
-];
+  const handleQuestionClick = (id: string) => {
+    navigate(`/qa/question/${id}`);
+  };
 
-const QuestionList = () => {
+  const handleLoadMore = () => {
+    setPage(prev => prev + 1);
+  };
+
+  const handleQuestionAdded = () => {
+    // Reset to page 0 and fetch questions again
+    setPage(0);
+    fetchQuestions();
+    setIsAskDialogOpen(false);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Recent Questions</h2>
-        <Button className="bg-brand-purple hover:bg-brand-purple/90">
-          <MessageSquare className="h-4 w-4 mr-2" />
-          Ask Question
-        </Button>
+        <h2 className="text-2xl font-bold">{title}</h2>
+        {showAskButton && (
+          <Dialog open={isAskDialogOpen} onOpenChange={setIsAskDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-brand-purple hover:bg-brand-purple/90">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Ask Question
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <AskQuestion onQuestionAdded={handleQuestionAdded} />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
       
-      {questions.map((question) => (
-        <Card key={question.id} className="hover:border-brand-purple/50 transition-colors">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4">
-              <div className="flex md:flex-col items-center md:items-start gap-4 md:gap-2">
-                <div className="flex items-center gap-1">
-                  <ThumbsUp className="h-4 w-4 text-brand-orange" />
-                  <span className="font-medium">{question.votes}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <MessageSquare className="h-4 w-4 text-brand-blue" />
-                  <span>{question.answers}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">{question.views}</span>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-medium">
-                  <a href="#" className="hover:text-brand-purple transition-colors">
-                    {question.title}
-                  </a>
-                </h3>
-                <p className="text-muted-foreground mt-1">{question.preview}</p>
-                
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {question.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="bg-secondary hover:bg-secondary/80">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-                
-                <div className="flex items-center justify-between mt-4">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={question.author.avatar} alt={question.author.name} />
-                      <AvatarFallback className="bg-brand-purple text-white text-xs">
-                        {question.author.initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{question.author.name}</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">{question.posted}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
+      {isLoading && page === 0 ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-brand-purple" />
+        </div>
+      ) : questions.length === 0 ? (
+        <Card className="p-8">
+          <div className="text-center">
+            <p className="text-muted-foreground mb-4">No questions found</p>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="bg-brand-purple hover:bg-brand-purple/90">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Ask the First Question
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <AskQuestion onQuestionAdded={handleQuestionAdded} />
+              </DialogContent>
+            </Dialog>
+          </div>
         </Card>
-      ))}
-      
-      <div className="flex justify-center mt-6">
-        <Button variant="outline">Load More Questions</Button>
-      </div>
+      ) : (
+        <>
+          {questions.map((question) => (
+            <Card 
+              key={question.id} 
+              className="hover:border-brand-purple/50 transition-colors cursor-pointer" 
+              onClick={() => handleQuestionClick(question.id)}
+            >
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4">
+                  <div className="flex md:flex-col items-center md:items-start gap-4 md:gap-2">
+                    <div className="flex items-center gap-1">
+                      <ThumbsUp className="h-4 w-4 text-brand-orange" />
+                      <span className="font-medium">{question.votes}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <MessageSquare className="h-4 w-4 text-brand-blue" />
+                      <span>{question.answers_count || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{question.views}</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-medium hover:text-brand-purple transition-colors">
+                      {question.title}
+                    </h3>
+                    <p className="text-muted-foreground mt-1">{question.preview}</p>
+                    
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {question.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="bg-secondary hover:bg-secondary/80">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-4">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={question.author?.avatar_url} alt={question.author?.name} />
+                          <AvatarFallback className="bg-brand-purple text-white text-xs">
+                            {question.author?.initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{question.author?.name}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {formatDistanceToNow(new Date(question.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <Button 
+                variant="outline" 
+                onClick={handleLoadMore}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  'Load More Questions'
+                )}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

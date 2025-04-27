@@ -1,20 +1,31 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Upload, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, FileText, Image as ImageIcon, Loader2, UserPlus, Check } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { resourcesApi, profilesApi, ApiResponse, UserProfile } from '@/services/supabaseApi';
+import { useSupabaseMutation, useSupabaseQuery, useSupabaseDirectQuery } from '@/hooks/useSupabase';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-const FileUploader = () => {
+interface FileUploaderProps {
+  userId: string;
+}
+
+const FileUploader: React.FC<FileUploaderProps> = ({ userId }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -62,6 +73,62 @@ const FileUploader = () => {
     setFiles(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  // Fetch users for sharing
+  const { data: usersData } = useSupabaseDirectQuery<UserProfile[]>(
+    ['users'],
+    async () => {
+      const response = await profilesApi.getAll();
+      return response.data || [];
+    },
+    {
+      initialData: []
+    }
+  );
+  
+  const users = usersData || [];
+
+  // Filter users based on search query and exclude current user
+  const filteredUsers = users
+    ? users
+        .filter(user => user.id !== userId) // Exclude current user
+        .filter(user => 
+          searchQuery.trim() === '' || 
+          user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          user.email?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+    : [];
+
+  // Use Supabase mutation for file upload
+  const uploadMutation = useSupabaseMutation(
+    (file: File) => resourcesApi.upload(userId, file, {
+      title,
+      description,
+      tags: [],
+      visibility,
+      shared_with: visibility === 'private' ? selectedUsers : []
+    }),
+    {
+      onSuccess: () => {
+        toast({
+          title: "Upload successful",
+          description: `File uploaded successfully.`,
+        });
+        setFiles([]);
+        setTitle('');
+        setDescription('');
+        setIsUploading(false);
+      },
+      onError: (error) => {
+        toast({
+          variant: "destructive",
+          title: "Upload failed",
+          description: error.message || "An error occurred during upload.",
+        });
+        setIsUploading(false);
+      }
+    }
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -84,18 +151,10 @@ const FileUploader = () => {
     }
 
     setIsUploading(true);
-
-    // Mock file upload
-    setTimeout(() => {
-      toast({
-        title: "Upload successful",
-        description: `${files.length} file(s) uploaded successfully.`,
-      });
-      setFiles([]);
-      setTitle('');
-      setDescription('');
-      setIsUploading(false);
-    }, 2000);
+    
+    // Upload the first file (for simplicity)
+    // In a real app, you might want to handle multiple files
+    uploadMutation.mutate(files[0]);
   };
 
   const getFileIcon = (file: File) => {
@@ -192,33 +251,109 @@ const FileUploader = () => {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label>Visibility</Label>
-            <RadioGroup 
-              defaultValue="public"
-              value={visibility}
-              onValueChange={(value) => setVisibility(value as 'public' | 'private')}
-              className="flex space-x-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="public" id="public" />
-                <Label htmlFor="public">Public</Label>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Visibility</Label>
+              <RadioGroup 
+                defaultValue="public"
+                value={visibility}
+                onValueChange={(value) => {
+                  setVisibility(value as 'public' | 'private');
+                  // Reset selected users when switching to public
+                  if (value === 'public') {
+                    setSelectedUsers([]);
+                  }
+                }}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="public" id="public" />
+                  <Label htmlFor="public">Public</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="private" id="private" />
+                  <Label htmlFor="private">Private</Label>
+                </div>
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground">
+                {visibility === 'public' 
+                  ? "Public resources can be accessed by all users on the platform." 
+                  : "Private resources can only be accessed by you and users you select."}
+              </p>
+            </div>
+            
+            {visibility === 'private' && (
+              <div className="space-y-3 border rounded-md p-3">
+                <div className="flex justify-between items-center">
+                  <Label>Share with users</Label>
+                  <div className="text-xs text-muted-foreground">
+                    {selectedUsers.length} user(s) selected
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Input 
+                    placeholder="Search users by name or email"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  
+                  <ScrollArea className="h-40 border rounded-md p-2">
+                    {filteredUsers.length > 0 ? (
+                      <div className="space-y-2">
+                        {filteredUsers.map(user => (
+                          <div key={user.id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded-md">
+                            <Checkbox 
+                              id={`user-${user.id}`}
+                              checked={selectedUsers.includes(user.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedUsers(prev => [...prev, user.id]);
+                                } else {
+                                  setSelectedUsers(prev => prev.filter(id => id !== user.id));
+                                }
+                              }}
+                            />
+                            <div className="flex items-center space-x-2 flex-1">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={user.avatar_url || ''} alt={user.name || 'User'} />
+                                <AvatarFallback>{user.name?.substring(0, 2).toUpperCase() || 'U'}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-medium">{user.name || 'Unknown User'}</p>
+                                <p className="text-xs text-muted-foreground">{user.email}</p>
+                              </div>
+                            </div>
+                            {selectedUsers.includes(user.id) && (
+                              <Check className="h-4 w-4 text-primary" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                        <UserPlus className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          {searchQuery ? 'No users found' : 'Select users to share with'}
+                        </p>
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="private" id="private" />
-                <Label htmlFor="private">Private</Label>
-              </div>
-            </RadioGroup>
-            <p className="text-xs text-muted-foreground">
-              {visibility === 'public' 
-                ? "Public resources can be accessed by all users on the platform." 
-                : "Private resources can only be accessed by you."}
-            </p>
+            )}
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button disabled={isUploading} type="submit">
-            {isUploading ? "Uploading..." : "Upload"}
+          <Button disabled={isUploading || uploadMutation.isPending} type="submit">
+            {isUploading || uploadMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              "Upload"
+            )}
           </Button>
         </CardFooter>
       </form>

@@ -40,7 +40,7 @@ const Index = () => {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Welcome to Academia Nexus</h1>
+            <h1 className="text-3xl font-bold">Welcome to ThinkBridge</h1>
             <p className="text-muted-foreground mt-1">Your digital space for academic collaboration</p>
           </div>
           <div className="mt-4 sm:mt-0">

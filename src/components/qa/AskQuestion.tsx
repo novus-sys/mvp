@@ -5,16 +5,24 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MessageSquare, Tag } from 'lucide-react';
+import { MessageSquare, Tag, Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { useSupabaseAuth } from '@/contexts/SupabaseAuthContext';
+import { createQuestion } from '@/lib/qa-service';
 
-const AskQuestion = () => {
+interface AskQuestionProps {
+  onQuestionAdded?: () => void;
+}
+
+const AskQuestion = ({ onQuestionAdded }: AskQuestionProps) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { user } = useSupabaseAuth();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title.trim() || !content.trim()) {
@@ -25,20 +33,71 @@ const AskQuestion = () => {
       });
       return;
     }
+
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Authentication required",
+        description: "You must be logged in to post a question.",
+      });
+      return;
+    }
+    
+    console.log('Current user:', user);
+    console.log('User ID:', user.id);
     
     setIsSubmitting(true);
     
-    // Mock API call
-    setTimeout(() => {
+    try {
+      // Process tags
+      const tagArray = tags
+        .split(',')
+        .map(tag => tag.trim().toLowerCase())
+        .filter(tag => tag.length > 0);
+      
+      console.log('Processed tags:', tagArray);
+      
+      // Create the question
+      console.log('Submitting question with:', { title, content, tagArray, user });
+      try {
+        const result = await createQuestion(title, content, tagArray, user);
+        
+        console.log('Question created successfully:', result);
+        toast({
+          title: "Question posted",
+          description: "Your question has been successfully posted.",
+        });
+        
+        // Reset form
+        setTitle('');
+        setContent('');
+        setTags('');
+        
+        // Notify parent component
+        if (onQuestionAdded) {
+          onQuestionAdded();
+        }
+      } catch (createError) {
+        console.error('Error from createQuestion:', createError);
+        throw createError;
+      }
+    } catch (error) {
+      console.error('Error posting question:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+      
       toast({
-        title: "Question posted",
-        description: "Your question has been posted successfully.",
+        variant: "destructive",
+        title: "Error posting question",
+        description: error instanceof Error 
+          ? `${error.message}` 
+          : "An unknown error occurred while creating your question",
       });
-      setTitle('');
-      setContent('');
-      setTags('');
+    } finally {
       setIsSubmitting(false);
-    }, 1000);
+    }
   };
 
   return (

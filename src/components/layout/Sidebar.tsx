@@ -24,7 +24,7 @@ const Sidebar = () => {
     { name: 'Profile', path: '/profile', icon: <User size={20} /> },
     { name: 'Resources', path: '/resources', icon: <FileText size={20} /> },
     { name: 'Projects', path: '/projects', icon: <BookOpen size={20} /> },
-    { name: 'Q&A Forum', path: '/qa-forum', icon: <MessageCircle size={20} /> },
+    { name: 'Q&A Forum', path: '/qa', icon: <MessageCircle size={20} /> },
     { name: 'Mentorship', path: '/mentorship', icon: <Users size={20} /> },
     { name: 'Opportunities', path: '/opportunities', icon: <GraduationCap size={20} /> },
     { name: 'Achievements', path: '/achievements', icon: <Award size={20} /> },
@@ -57,20 +57,16 @@ const Sidebar = () => {
       )}
     >
       <div className={cn("p-4 flex items-center", !isOpen && "justify-center")}>
-        {isOpen ? (
-          <Link to="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md bg-gradient-to-br from-brand-orange to-brand-purple flex items-center justify-center">
-              <span className="text-white font-bold">AN</span>
-            </div>
-            <h1 className="text-xl font-bold">Academia<span className="text-brand-purple">Nexus</span></h1>
-          </Link>
-        ) : (
-          <Link to="/" className="flex items-center justify-center">
-            <div className="h-8 w-8 rounded-md bg-gradient-to-br from-brand-orange to-brand-purple flex items-center justify-center">
-              <span className="text-white font-bold">A</span>
-            </div>
-          </Link>
-        )}
+        <Link to="/" className="flex items-center justify-center">
+          <img 
+            src="/logo1.png" 
+            alt="AcademiaNexus Logo" 
+            className={cn(
+              "w-auto", 
+              isOpen ? "h-12" : "h-8"
+            )} 
+          />
+        </Link>
       </div>
 
       <Separator />

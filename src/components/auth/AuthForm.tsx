@@ -1,6 +1,9 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useSupabaseAuth } from '@/contexts/SupabaseAuthContext';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,8 +15,9 @@ type AuthMode = 'login' | 'register';
 
 const AuthForm = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn, signUp, isLoading, isConfigured } = useSupabaseAuth();
   const [authMode, setAuthMode] = useState<AuthMode>('login');
-  const [isLoading, setIsLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -33,31 +37,61 @@ const AuthForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     
     try {
-      // Mock authentication success
-      setTimeout(() => {
-        // This would be an actual API call in production
-        toast({
-          title: authMode === 'login' ? "Login successful!" : "Registration successful!",
-          description: "Welcome to Academia Nexus",
+      // Get the redirect path from location state or default to home
+      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+      
+      if (authMode === 'login') {
+        await signIn(formData.email, formData.password);
+        navigate(from);
+      } else {
+        // Validate passwords match
+        if (formData.password !== formData.confirmPassword) {
+          toast({
+            variant: "destructive",
+            title: "Passwords don't match",
+            description: "Please make sure your passwords match.",
+          });
+          return;
+        }
+        
+        // Register the user
+        await signUp(formData.email, formData.password, {
+          name: formData.name,
+          role: formData.role as 'student' | 'researcher' | 'educator' | 'admin',
+          institution: formData.institution,
         });
-        navigate('/');
-        setIsLoading(false);
-      }, 1000);
+        
+        // After signup, we don't automatically navigate because Supabase sends a confirmation email
+        toast({
+          title: "Registration successful!",
+          description: "Please check your email to confirm your account.",
+        });
+      }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Authentication failed",
-        description: "Please check your credentials and try again.",
-      });
-      setIsLoading(false);
+      // Error handling is done in the auth context
+      console.error('Authentication error:', error);
     }
   };
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-background px-4">
+      {!isConfigured && (
+        <Alert variant="destructive" className="absolute top-4 left-4 right-4 max-w-xl mx-auto">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Supabase Not Configured</AlertTitle>
+          <AlertDescription>
+            <p>Supabase credentials are missing. To fix this:</p>
+            <ol className="list-decimal pl-5 mt-2 space-y-1">
+              <li>Create a <code>.env</code> file in the project root</li>
+              <li>Add your Supabase URL: <code>VITE_SUPABASE_URL=your_supabase_url</code></li>
+              <li>Add your Supabase anon key: <code>VITE_SUPABASE_ANON_KEY=your_anon_key</code></li>
+              <li>Restart the development server</li>
+            </ol>
+          </AlertDescription>
+        </Alert>
+      )}
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
@@ -65,7 +99,7 @@ const AuthForm = () => {
               <span className="text-white font-bold text-xl">AN</span>
             </div>
           </div>
-          <CardTitle className="text-2xl text-center gradient-text">Academia Nexus</CardTitle>
+          <CardTitle className="text-2xl text-center gradient-text">ThinkBridge</CardTitle>
           <CardDescription className="text-center">
             Share knowledge and collaborate with India's academic community
           </CardDescription>

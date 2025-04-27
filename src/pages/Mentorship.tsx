@@ -1,12 +1,15 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { GraduationCap, Users, Calendar, MessageCircle, Award } from 'lucide-react';
+import { GraduationCap, Users, Calendar, MessageCircle, Award, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSupabaseAuth } from '@/contexts/SupabaseAuthContext';
+import { registerAsMentor, checkMentorStatus } from '@/lib/mentorship-service';
+import { toast } from '@/components/ui/use-toast';
 
 const mentors = [
   {
@@ -173,6 +176,64 @@ const MenteeCard = ({ mentee }) => {
 };
 
 const Mentorship = () => {
+  const { user } = useSupabaseAuth();
+  const [isMentor, setIsMentor] = useState<boolean>(false);
+  const [isRegistering, setIsRegistering] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // Check if user is already a mentor
+  useEffect(() => {
+    const checkStatus = async () => {
+      if (user) {
+        setIsLoading(true);
+        const status = await checkMentorStatus(user.id);
+        setIsMentor(status);
+        setIsLoading(false);
+      } else {
+        setIsMentor(false);
+        setIsLoading(false);
+      }
+    };
+    
+    checkStatus();
+  }, [user]);
+  
+  // Handle mentor registration
+  const handleRegisterAsMentor = async () => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Authentication required",
+        description: "You must be logged in to register as a mentor."
+      });
+      return;
+    }
+    
+    setIsRegistering(true);
+    try {
+      const success = await registerAsMentor(user);
+      
+      if (success) {
+        setIsMentor(true);
+        toast({
+          title: "Registration successful",
+          description: "You are now registered as a mentor. You can update your mentor profile in your settings."
+        });
+      } else {
+        throw new Error("Failed to register as mentor");
+      }
+    } catch (error) {
+      console.error("Error registering as mentor:", error);
+      toast({
+        variant: "destructive",
+        title: "Registration failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred"
+      });
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+  
   return (
     <MainLayout>
       <div className="max-w-7xl mx-auto">
@@ -182,10 +243,34 @@ const Mentorship = () => {
             <p className="text-muted-foreground mt-1">Connect with experienced mentors or find mentees in your field</p>
           </div>
           <div className="mt-4 sm:mt-0">
-            <Button>
-              <GraduationCap className="mr-2 h-4 w-4" />
-              Register as Mentor
-            </Button>
+            {isLoading ? (
+              <Button disabled>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading...
+              </Button>
+            ) : isMentor ? (
+              <Badge className="px-3 py-1 bg-brand-purple text-white">
+                <GraduationCap className="mr-2 h-4 w-4" />
+                Registered Mentor
+              </Badge>
+            ) : (
+              <Button 
+                onClick={handleRegisterAsMentor} 
+                disabled={isRegistering || !user}
+              >
+                {isRegistering ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Registering...
+                  </>
+                ) : (
+                  <>
+                    <GraduationCap className="mr-2 h-4 w-4" />
+                    Register as Mentor
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
