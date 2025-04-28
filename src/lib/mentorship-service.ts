@@ -127,6 +127,80 @@ export const checkMentorStatus = async (userId: string): Promise<boolean> => {
 };
 
 /**
+ * Unregister the current user from being a mentor
+ * @param user The authenticated user
+ * @returns Success status
+ */
+export const unregisterAsMentor = async (user: User): Promise<boolean> => {
+  try {
+    console.log('Unregistering user as mentor:', user.id);
+    
+    // First remove from Supabase auth metadata
+    try {
+      // Update the user's metadata in auth to remove mentor status
+      const { error: authError } = await supabase.auth.updateUser({
+        data: {
+          is_mentor: false,
+          mentor_data: null
+        }
+      });
+      
+      if (authError) {
+        console.error('Error updating auth metadata:', authError);
+      } else {
+        console.log('Successfully updated auth metadata to remove mentor status');
+      }
+    } catch (error) {
+      console.error('Error updating auth metadata:', error);
+    }
+    
+    // Remove from localStorage as well
+    try {
+      // Get existing mentor data from localStorage
+      const existingDataStr = localStorage.getItem(MENTOR_DATA_KEY);
+      if (existingDataStr) {
+        let existingData: Record<string, MentorData> = JSON.parse(existingDataStr);
+        
+        // Remove this user's mentor data
+        if (existingData[user.id]) {
+          delete existingData[user.id];
+          
+          // Save back to localStorage
+          localStorage.setItem(MENTOR_DATA_KEY, JSON.stringify(existingData));
+          console.log('Successfully removed mentor data from localStorage');
+        }
+      }
+    } catch (storageError) {
+      console.error('Error removing from localStorage:', storageError);
+    }
+    
+    // Try to remove from mentor_data table if it exists
+    try {
+      const { error } = await supabase
+        .from('mentor_data')
+        .delete()
+        .eq('user_id', user.id);
+        
+      if (error) {
+        console.log('Note: Could not remove from mentor_data table:', error);
+        // This is expected if the table doesn't exist or the user doesn't have a record
+      } else {
+        console.log('Successfully removed from mentor_data table');
+      }
+    } catch (dbError) {
+      console.error('Error removing from mentor_data table:', dbError);
+      // Continue even if this fails
+    }
+    
+    console.log('Successfully unregistered as mentor');
+    return true;
+  } catch (error) {
+    console.error('Error in unregisterAsMentor:', error);
+    return false;
+  }
+};
+
+/**
  * Get all registered mentors
  * @returns Array of mentor profiles with their mentor data
  */

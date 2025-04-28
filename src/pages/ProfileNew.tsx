@@ -27,10 +27,22 @@ const ProfileNew = () => {
     institution: '',
     location: '',
     bio: '',
-    avatar_url: ''
+    avatar_url: '',
+    skills: [] as string[],
+    academic_timeline: [] as Array<{id: string, degree: string, institution: string, year: string}>,
+    stats: {
+      papers: 0,
+      projects: 0,
+      mentees: 0,
+      resources: 0,
+      answers: 0
+    }
   });
   
-  // Stats for the user (these would ideally come from API calls)
+  // Academic timeline entries
+  const [academicTimeline, setAcademicTimeline] = useState<Array<{id: string, degree: string, institution: string, year: string}>>([]);
+  
+  // Stats for the user
   const [userStats, setUserStats] = useState({
     papers: 0,
     projects: 0,
@@ -42,14 +54,43 @@ const ProfileNew = () => {
   // Initialize editable profile when user profile is loaded
   useEffect(() => {
     if (profile) {
+      // Set basic profile info
       setEditableProfile({
         name: profile.name || '',
         title: profile.title || '',
         institution: profile.institution || '',
         location: profile.location || '',
         bio: profile.bio || '',
-        avatar_url: profile.avatar_url || ''
+        avatar_url: profile.avatar_url || '',
+        skills: Array.isArray(profile.skills) ? profile.skills : [],
+        academic_timeline: Array.isArray(profile.academic_timeline) ? profile.academic_timeline : [],
+        stats: profile.stats || {
+          papers: 0,
+          projects: 0,
+          mentees: 0,
+          resources: 0,
+          answers: 0
+        }
       });
+      
+      // Set academic timeline
+      if (profile.academic_timeline && Array.isArray(profile.academic_timeline)) {
+        setAcademicTimeline(profile.academic_timeline);
+      } else {
+        // Default empty timeline with one entry
+        setAcademicTimeline([{ id: '1', degree: '', institution: '', year: '' }]);
+      }
+      
+      // Set user stats
+      if (profile.stats) {
+        setUserStats({
+          papers: profile.stats.papers || 0,
+          projects: profile.stats.projects || 0,
+          mentees: profile.stats.mentees || 0,
+          resources: profile.stats.resources || 0,
+          answers: profile.stats.answers || 0
+        });
+      }
     }
   }, [profile]);
   
@@ -77,10 +118,56 @@ const ProfileNew = () => {
     }));
   };
   
+  // Handle academic timeline entry changes
+  const handleTimelineChange = (index: number, field: string, value: string) => {
+    const updatedTimeline = [...academicTimeline];
+    updatedTimeline[index] = {
+      ...updatedTimeline[index],
+      [field]: value
+    };
+    setAcademicTimeline(updatedTimeline);
+  };
+  
+  // Add new academic timeline entry
+  const addTimelineEntry = () => {
+    setAcademicTimeline([...academicTimeline, {
+      id: Date.now().toString(),
+      degree: '',
+      institution: '',
+      year: ''
+    }]);
+  };
+  
+  // Remove academic timeline entry
+  const removeTimelineEntry = (index: number) => {
+    const updatedTimeline = [...academicTimeline];
+    updatedTimeline.splice(index, 1);
+    setAcademicTimeline(updatedTimeline);
+  };
+  
+  // Handle stats changes
+  const handleStatsChange = (field: string, value: number) => {
+    setUserStats(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  
   // Save profile changes
   const handleSaveProfile = async () => {
     try {
-      await updateProfile(editableProfile);
+      // Prepare the updated profile with academic timeline and stats
+      const updatedProfile = {
+        ...editableProfile,
+        academic_timeline: academicTimeline,
+        stats: userStats
+      };
+      
+      console.log('Saving profile with academic timeline and stats:', updatedProfile);
+      
+      // Update profile using the context method
+      await updateProfile(updatedProfile);
+      
       setIsEditing(false);
       toast({
         title: "Profile updated",
@@ -106,8 +193,43 @@ const ProfileNew = () => {
         institution: profile.institution || '',
         location: profile.location || '',
         bio: profile.bio || '',
-        avatar_url: profile.avatar_url || ''
+        avatar_url: profile.avatar_url || '',
+        skills: Array.isArray(profile.skills) ? profile.skills : [],
+        academic_timeline: Array.isArray(profile.academic_timeline) ? profile.academic_timeline : [],
+        stats: profile.stats || {
+          papers: 0,
+          projects: 0,
+          mentees: 0,
+          resources: 0,
+          answers: 0
+        }
       });
+      
+      // Reset academic timeline
+      if (profile.academic_timeline && Array.isArray(profile.academic_timeline)) {
+        setAcademicTimeline(profile.academic_timeline);
+      } else {
+        setAcademicTimeline([{ id: '1', degree: '', institution: '', year: '' }]);
+      }
+      
+      // Reset stats
+      if (profile.stats) {
+        setUserStats({
+          papers: profile.stats.papers || 0,
+          projects: profile.stats.projects || 0,
+          mentees: profile.stats.mentees || 0,
+          resources: profile.stats.resources || 0,
+          answers: profile.stats.answers || 0
+        });
+      } else {
+        setUserStats({
+          papers: 0,
+          projects: 0,
+          mentees: 0,
+          resources: 0,
+          answers: 0
+        });
+      }
     }
     setIsEditing(false);
   };
@@ -349,6 +471,130 @@ const ProfileNew = () => {
                           className="min-h-[100px]"
                         />
                       </div>
+                      
+                      <div className="mt-6">
+                        <Label className="font-medium mb-2 block">Academic Timeline</Label>
+                        <p className="text-sm text-muted-foreground mb-3">Add your educational background and qualifications</p>
+                        
+                        {academicTimeline.map((entry, index) => (
+                          <div key={entry.id} className="grid grid-cols-12 gap-2 items-end mb-3">
+                            <div className="col-span-4">
+                              <Label htmlFor={`degree-${index}`} className="text-xs">Degree</Label>
+                              <Input
+                                id={`degree-${index}`}
+                                value={entry.degree}
+                                onChange={(e) => handleTimelineChange(index, 'degree', e.target.value)}
+                                placeholder="e.g. PhD, MSc"
+                                className="mt-1"
+                              />
+                            </div>
+                            <div className="col-span-4">
+                              <Label htmlFor={`institution-${index}`} className="text-xs">Institution</Label>
+                              <Input
+                                id={`institution-${index}`}
+                                value={entry.institution}
+                                onChange={(e) => handleTimelineChange(index, 'institution', e.target.value)}
+                                placeholder="University name"
+                                className="mt-1"
+                              />
+                            </div>
+                            <div className="col-span-3">
+                              <Label htmlFor={`year-${index}`} className="text-xs">Year</Label>
+                              <Input
+                                id={`year-${index}`}
+                                value={entry.year}
+                                onChange={(e) => handleTimelineChange(index, 'year', e.target.value)}
+                                placeholder="e.g. 2022"
+                                className="mt-1"
+                              />
+                            </div>
+                            <div className="col-span-1">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => removeTimelineEntry(index)}
+                                disabled={academicTimeline.length <= 1}
+                                className="h-10 w-10 mt-1"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={addTimelineEntry}
+                          className="mt-2"
+                        >
+                          <GraduationCap className="h-4 w-4 mr-2" />
+                          Add Education
+                        </Button>
+                      </div>
+                      
+                      <div className="mt-6">
+                        <Label className="font-medium mb-2 block">Academic Stats</Label>
+                        <p className="text-sm text-muted-foreground mb-3">Update your academic metrics</p>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="papers" className="text-xs">Papers</Label>
+                            <Input
+                              id="papers"
+                              type="number"
+                              min="0"
+                              value={userStats.papers}
+                              onChange={(e) => handleStatsChange('papers', parseInt(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="projects" className="text-xs">Projects</Label>
+                            <Input
+                              id="projects"
+                              type="number"
+                              min="0"
+                              value={userStats.projects}
+                              onChange={(e) => handleStatsChange('projects', parseInt(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="mentees" className="text-xs">Mentees</Label>
+                            <Input
+                              id="mentees"
+                              type="number"
+                              min="0"
+                              value={userStats.mentees}
+                              onChange={(e) => handleStatsChange('mentees', parseInt(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="resources" className="text-xs">Resources</Label>
+                            <Input
+                              id="resources"
+                              type="number"
+                              min="0"
+                              value={userStats.resources}
+                              onChange={(e) => handleStatsChange('resources', parseInt(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="answers" className="text-xs">Answers</Label>
+                            <Input
+                              id="answers"
+                              type="number"
+                              min="0"
+                              value={userStats.answers}
+                              onChange={(e) => handleStatsChange('answers', parseInt(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </>
                   ) : (
                     <>
@@ -414,6 +660,38 @@ const ProfileNew = () => {
                         </div>
                         <Progress value={85} className="h-2" />
                       </div>
+                    </div>
+                    
+                    <Separator className="my-6" />
+                    
+                    {/* Academic Timeline */}
+                    <div className="mb-6">
+                      <h3 className="font-medium mb-4">Academic Timeline</h3>
+                      {profile.academic_timeline && Array.isArray(profile.academic_timeline) && profile.academic_timeline.length > 0 ? (
+                        <div className="space-y-3">
+                          {profile.academic_timeline.map((item, index) => (
+                            <div key={item.id || index} className="flex items-start gap-3">
+                              <div className="mt-0.5 h-6 w-6 rounded-full bg-brand-purple/20 flex items-center justify-center">
+                                <GraduationCap className="h-3.5 w-3.5 text-brand-purple" />
+                              </div>
+                              <div>
+                                <h4 className="font-medium">{item.degree}</h4>
+                                <div className="text-sm text-muted-foreground flex items-center gap-1">
+                                  <span>{item.institution}</span>
+                                  {item.year && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{item.year}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No academic history added yet.</p>
+                      )}
                     </div>
                     
                     <Separator className="my-6" />

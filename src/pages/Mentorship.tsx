@@ -5,11 +5,21 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { GraduationCap, Users, Calendar, MessageCircle, Award, Loader2 } from 'lucide-react';
+import { GraduationCap, Users, Calendar, MessageCircle, Award, Loader2, Sparkles } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSupabaseAuth } from '@/contexts/SupabaseAuthContext';
-import { registerAsMentor, checkMentorStatus } from '@/lib/mentorship-service';
+import { registerAsMentor, unregisterAsMentor, checkMentorStatus } from '@/lib/mentorship-service';
 import { toast } from '@/components/ui/use-toast';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from '@/components/ui/dialog';
+import MentorMatching from '@/components/mentorship/MentorMatching';
+import MentorProfile from '@/components/mentorship/MentorProfile';
 
 const mentors = [
   {
@@ -84,53 +94,72 @@ const mentees = [
 ];
 
 const MentorCard = ({ mentor }) => {
+  const [showProfile, setShowProfile] = useState(false);
+  
+  const handleRequestMentorship = () => {
+    toast({
+      title: "Mentorship Request Sent",
+      description: `Your request to ${mentor.name} has been sent successfully.`,
+    });
+  };
+  
   return (
-    <Card className="h-full">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-12 w-12">
-              <AvatarImage src={mentor.image} alt={mentor.name} />
-              <AvatarFallback className="bg-brand-purple text-white">{mentor.initials}</AvatarFallback>
-            </Avatar>
-            <div>
-              <CardTitle className="text-lg">{mentor.name}</CardTitle>
-              <CardDescription>{mentor.role}</CardDescription>
-              <p className="text-xs text-muted-foreground">{mentor.institution}</p>
+    <>
+      <Card className="h-full">
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-12 w-12">
+                <AvatarImage src={mentor.image} alt={mentor.name} />
+                <AvatarFallback className="bg-brand-purple text-white">{mentor.initials}</AvatarFallback>
+              </Avatar>
+              <div>
+                <CardTitle className="text-lg">{mentor.name}</CardTitle>
+                <CardDescription>{mentor.role}</CardDescription>
+                <p className="text-xs text-muted-foreground">{mentor.institution}</p>
+              </div>
+            </div>
+            <Badge className="bg-brand-purple text-white">Mentor</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h4 className="text-sm font-medium mb-2">Specializations</h4>
+            <div className="flex flex-wrap gap-2">
+              {mentor.specialization.map((spec, index) => (
+                <Badge key={index} variant="outline">{spec}</Badge>
+              ))}
             </div>
           </div>
-          <Badge className="bg-brand-purple text-white">Mentor</Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <h4 className="text-sm font-medium mb-2">Specializations</h4>
-          <div className="flex flex-wrap gap-2">
-            {mentor.specialization.map((spec, index) => (
-              <Badge key={index} variant="outline">{spec}</Badge>
-            ))}
+          <div>
+            <h4 className="text-sm font-medium mb-2">Availability</h4>
+            <p className="text-sm">{mentor.availability}</p>
           </div>
-        </div>
-        <div>
-          <h4 className="text-sm font-medium mb-2">Availability</h4>
-          <p className="text-sm">{mentor.availability}</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center">
-            <Award className="h-4 w-4 text-brand-orange mr-1" />
-            <span className="text-sm">{mentor.rating} Rating</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center">
+              <Award className="h-4 w-4 text-brand-orange mr-1" />
+              <span className="text-sm">{mentor.rating} Rating</span>
+            </div>
+            <div className="flex items-center">
+              <Users className="h-4 w-4 text-brand-blue mr-1" />
+              <span className="text-sm">{mentor.students} Mentees</span>
+            </div>
           </div>
-          <div className="flex items-center">
-            <Users className="h-4 w-4 text-brand-blue mr-1" />
-            <span className="text-sm">{mentor.students} Mentees</span>
-          </div>
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline">View Profile</Button>
-        <Button>Request Mentorship</Button>
-      </CardFooter>
-    </Card>
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <Button variant="outline" onClick={() => setShowProfile(true)}>View Profile</Button>
+          <Button onClick={handleRequestMentorship}>Request Mentorship</Button>
+        </CardFooter>
+      </Card>
+      
+      {/* Mentor Profile Dialog */}
+      <MentorProfile 
+        mentor={mentor} 
+        isOpen={showProfile} 
+        onClose={() => setShowProfile(false)}
+        onRequestMentorship={handleRequestMentorship}
+      />
+    </>
   );
 };
 
@@ -179,7 +208,10 @@ const Mentorship = () => {
   const { user } = useSupabaseAuth();
   const [isMentor, setIsMentor] = useState<boolean>(false);
   const [isRegistering, setIsRegistering] = useState<boolean>(false);
+  const [isUnregistering, setIsUnregistering] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [showMatchingDialog, setShowMatchingDialog] = useState<boolean>(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState<boolean>(false);
   
   // Check if user is already a mentor
   useEffect(() => {
@@ -234,8 +266,97 @@ const Mentorship = () => {
     }
   };
   
+  // Handle mentor unregistration
+  const handleUnregisterAsMentor = async () => {
+    if (!user) return;
+    
+    setIsUnregistering(true);
+    try {
+      const success = await unregisterAsMentor(user);
+      
+      if (success) {
+        setIsMentor(false);
+        toast({
+          title: "Unregistration successful",
+          description: "You are no longer registered as a mentor."
+        });
+      } else {
+        throw new Error("Failed to unregister as mentor");
+      }
+    } catch (error) {
+      console.error("Error unregistering as mentor:", error);
+      toast({
+        variant: "destructive",
+        title: "Unregistration failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred"
+      });
+    } finally {
+      setIsUnregistering(false);
+      setShowConfirmDialog(false);
+    }
+  };
+  
+  // Open confirmation dialog for unregistration
+  const handleMentorStatusToggle = () => {
+    if (isMentor) {
+      setShowConfirmDialog(true);
+    } else {
+      handleRegisterAsMentor();
+    }
+  };
+  
+  // Close the confirmation dialog
+  const handleCloseConfirmDialog = () => {
+    setShowConfirmDialog(false);
+  };
+  
+  // Close the matching dialog
+  const handleCloseMatchingDialog = () => {
+    setShowMatchingDialog(false);
+  };
+  
   return (
     <MainLayout>
+      {/* AI Mentor Matching Dialog */}
+      <Dialog open={showMatchingDialog} onOpenChange={setShowMatchingDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-brand-purple" />
+              AI-Powered Mentor Matching
+            </DialogTitle>
+          </DialogHeader>
+          <MentorMatching onClose={handleCloseMatchingDialog} />
+        </DialogContent>
+      </Dialog>
+      
+      {/* Unregister Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Unregistration</DialogTitle>
+            <DialogDescription className="pt-2">
+              Are you sure you want to unregister as a mentor? This will remove your mentor profile and you will no longer be visible to students seeking mentors.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 justify-end mt-4">
+            <Button variant="outline" onClick={handleCloseConfirmDialog}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleUnregisterAsMentor} disabled={isUnregistering}>
+              {isUnregistering ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Unregistering...
+                </>
+              ) : (
+                "Unregister"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
           <div>
@@ -248,20 +369,26 @@ const Mentorship = () => {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Loading...
               </Button>
-            ) : isMentor ? (
-              <Badge className="px-3 py-1 bg-brand-purple text-white">
-                <GraduationCap className="mr-2 h-4 w-4" />
-                Registered Mentor
-              </Badge>
             ) : (
               <Button 
-                onClick={handleRegisterAsMentor} 
-                disabled={isRegistering || !user}
+                onClick={handleMentorStatusToggle} 
+                disabled={isRegistering || isUnregistering || !user}
+                variant={isMentor ? "outline" : "default"}
               >
                 {isRegistering ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Registering...
+                  </>
+                ) : isUnregistering ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Unregistering...
+                  </>
+                ) : isMentor ? (
+                  <>
+                    <GraduationCap className="mr-2 h-4 w-4" />
+                    Unregister as Mentor
                   </>
                 ) : (
                   <>
@@ -282,9 +409,12 @@ const Mentorship = () => {
                   <h3 className="text-2xl font-bold">Find Your Academic Guide</h3>
                   <p className="opacity-90">Our mentorship program connects students with experienced academics for personalized guidance</p>
                 </div>
-                <Button className="bg-white text-brand-purple hover:bg-white/90">
-                  <MessageCircle className="mr-2 h-4 w-4" />
-                  Start Matching
+                <Button 
+                  className="bg-white text-brand-purple hover:bg-white/90"
+                  onClick={() => setShowMatchingDialog(true)}
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Start AI Matching
                 </Button>
               </div>
             </CardContent>

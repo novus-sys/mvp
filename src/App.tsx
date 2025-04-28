@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SupabaseAuthProvider } from "./contexts/SupabaseAuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Index from "./pages/Index";
-import Profile from "./pages/Profile";
+import ProfileNew from "./pages/ProfileNew";
 import Resources from "./pages/Resources";
 import QAForum from "./pages/QAForum";
 import QuestionDetail from "./pages/QuestionDetail";
@@ -37,7 +37,7 @@ const App = () => (
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Index />} />
-              <Route path="/profile" element={<Profile />} />
+              <Route path="/profile" element={<ProfileNew />} />
               <Route path="/resources" element={<Resources />} />
               <Route path="/qa" element={<QAForum />} />
               <Route path="/qa/question/:id" element={<QuestionDetail />} />

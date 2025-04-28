@@ -17,8 +17,8 @@ import { toast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const Profile = () => {
-  // Get auth user and updateProfile from context
-  const { user, updateProfile } = useSupabaseAuth();
+  // Get auth user, profile, and updateProfile from context
+  const { user, profile: contextProfile, updateProfile } = useSupabaseAuth();
   const [profileData, setProfileData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   // UI state
@@ -176,10 +176,27 @@ const Profile = () => {
     }
   };
   
-  // Fetch profile data on component mount or when user changes
+  // Effect to fetch profile data on component mount and check profile table
   useEffect(() => {
-    checkProfileTable().then(() => fetchProfileData());
+    if (user) {
+      checkProfileTable().then(() => fetchProfileData());
+    }
   }, [user]);
+  
+  // Effect to update profile data when context profile changes
+  useEffect(() => {
+    // If we have a profile from context, update our local state
+    if (user && contextProfile) {
+      setProfileData(prevData => {
+        // Only update if we have meaningful changes
+        if (JSON.stringify(prevData) !== JSON.stringify(contextProfile)) {
+          console.log('Updating profile data from context:', contextProfile);
+          return contextProfile;
+        }
+        return prevData;
+      });
+    }
+  }, [user, contextProfile]);
   
   // If no user is logged in or profile is loading
   if (!user || isLoading) {
@@ -310,7 +327,13 @@ const Profile = () => {
       
       await updateProfile(updatedProfile);
       
-      // Fetch the updated profile data to refresh the UI
+      // Update local state with the new values to ensure UI reflects changes
+      setProfileData({
+        ...profileData,
+        ...updatedProfile
+      });
+      
+      // Also fetch the updated profile data from the server to ensure consistency
       await fetchProfileData();
       
       setIsEditing(false);

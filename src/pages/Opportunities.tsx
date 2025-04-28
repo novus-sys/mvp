@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BookOpen, Calendar, Briefcase, GraduationCap, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/components/ui/use-toast';
 
 const opportunities = [
   {
@@ -81,11 +82,29 @@ const opportunities = [
 ];
 
 const OpportunityCard = ({ opportunity }) => {
+  const [hasApplied, setHasApplied] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  
   const typeColors = {
     'Research': 'bg-brand-purple/10 text-brand-purple border-brand-purple/50',
     'Teaching': 'bg-brand-blue/10 text-brand-blue border-brand-blue/50',
     'Internship': 'bg-brand-orange/10 text-brand-orange border-brand-orange/50',
     'PhD': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/50'
+  };
+  
+  const handleApply = () => {
+    setIsApplying(true);
+    
+    // Simulate API call with a small delay
+    setTimeout(() => {
+      setHasApplied(true);
+      setIsApplying(false);
+      
+      toast({
+        title: "Application Submitted",
+        description: `You have successfully applied for ${opportunity.title} at ${opportunity.organization}.`,
+      });
+    }, 800);
   };
 
   return (
@@ -136,7 +155,26 @@ const OpportunityCard = ({ opportunity }) => {
           </Avatar>
           <span className="text-xs text-muted-foreground">Posted by {opportunity.postedBy.name}</span>
         </div>
-        <Button>Apply Now</Button>
+        {hasApplied ? (
+          <Button variant="outline" className="text-green-600 border-green-600" disabled>
+            <GraduationCap className="mr-2 h-4 w-4" />
+            Applied
+          </Button>
+        ) : (
+          <Button 
+            onClick={handleApply} 
+            disabled={isApplying}
+          >
+            {isApplying ? (
+              <>
+                <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                Applying...
+              </>
+            ) : (
+              "Apply Now"
+            )}
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );
